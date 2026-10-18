@@ -60,13 +60,17 @@ class HomeScreen extends StatelessWidget {
           // Tonight's pick
           if (pick != null) ...[
             const SizedBox(height: Gap.section),
-            const SectionTitle('Cook tonight'),
+            SectionTitle('Cook tonight', action: 'Shuffle', onAction: app.shuffleTonight),
             const SizedBox(height: 12),
             _TonightCard(
               name: pick.recipe.name,
               image: pick.recipe.image,
               minutes: pick.recipe.minutes,
-              saves: pick.savesIds.isEmpty ? null : ingredientNames(pick.savesIds),
+              tag: pick.savesIds.isNotEmpty
+                  ? 'Uses your ${ingredientNames(pick.savesIds)}'
+                  : pick.canCookNow
+                      ? 'You have everything'
+                      : 'Missing: ${ingredientNames(pick.missing.map((m) => m.ingredientId))}',
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => RecipeDetailScreen(recipe: pick.recipe))),
             ),
           ],
@@ -143,9 +147,9 @@ class _TonightCard extends StatelessWidget {
   final String name;
   final String image;
   final int minutes;
-  final String? saves;
+  final String tag;
   final VoidCallback onTap;
-  const _TonightCard({required this.name, required this.image, required this.minutes, required this.saves, required this.onTap});
+  const _TonightCard({required this.name, required this.image, required this.minutes, required this.tag, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -162,10 +166,8 @@ class _TonightCard extends StatelessWidget {
                 Text(name, style: heading(20, color: W2T.butter)),
                 const SizedBox(height: 4),
                 Text('$minutes min', style: const TextStyle(fontSize: 13, color: W2T.oliveSoft)),
-                if (saves != null) ...[
-                  const SizedBox(height: 10),
-                  Tag('Uses your $saves', bg: W2T.butter, fg: W2T.olive),
-                ],
+                const SizedBox(height: 10),
+                Tag(tag, bg: W2T.butter, fg: W2T.olive),
               ],
             ),
           ),

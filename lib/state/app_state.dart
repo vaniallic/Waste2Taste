@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -37,9 +38,9 @@ class AppState extends ChangeNotifier {
       history = (j['history'] as List).map((e) => CookedEntry.fromJson(e as Map<String, dynamic>)).toList();
       diet = Set<String>.from(j['diet'] as List);
       tools = (j['tools'] as List).map((t) => Tool.values.byName(t as String)).toSet();
-    } else {
-      _seedDemoFridge();
     }
+    // First launch: the fridge starts empty. After that it only holds what the
+    // user added, minus what each cooked recipe used (see markCooked).
     loaded = true;
     notifyListeners();
   }
@@ -62,19 +63,6 @@ class AppState extends ChangeNotifier {
   void _changed() {
     notifyListeners();
     _save();
-  }
-
-  /// A few items so the app isn't empty the first time it opens.
-  void _seedDemoFridge() {
-    final now = DateTime.now();
-    fridge = [
-      FridgeItem(ingredientId: 'tomato', qty: 2, expiresAt: now.add(const Duration(days: 2))),
-      FridgeItem(ingredientId: 'rice', qty: 1, expiresAt: now),
-      FridgeItem(ingredientId: 'egg', qty: 3, expiresAt: now.add(const Duration(days: 9))),
-      FridgeItem(ingredientId: 'chicken', qty: 1, expiresAt: now.add(const Duration(days: 2))),
-      FridgeItem(ingredientId: 'soy_sauce', qty: 1, expiresAt: now.add(const Duration(days: 365))),
-      FridgeItem(ingredientId: 'garlic', qty: 1, expiresAt: now.add(const Duration(days: 20))),
-    ];
   }
 
   // ---------- account ----------
@@ -180,12 +168,24 @@ class AppState extends ChangeNotifier {
   RecipeMatch matchFor(Recipe r) => matches().firstWhere((m) => m.recipe.id == r.id,
       orElse: () => RecipeMatch(r, const [], r.ingredients.where((i) => !i.optional).toList(), const []));
 
-  /// The single best thing to cook tonight: can cook now and saves the most.
+  final _rng = Random();
+  Recipe? _tonight;
+
+  /// Random recipe for "Cook tonight" (respects the diet filter). It is picked
+  /// once per app launch so it doesn't jump around on every rebuild, and
+  /// shuffleTonight() picks another one. Works even when the fridge is empty.
   RecipeMatch? get tonightPick {
-    final ready = matches().where((m) => m.canCookNow).toList();
-    if (ready.isEmpty) return null;
-    ready.sort((a, b) => b.savesIds.length.compareTo(a.savesIds.length));
-    return ready.first;
+    final fits = recipes.where(_fitsDiet).toList();
+    if (fits.isEmpty) return null;
+    if (_tonight == null || !fits.contains(_tonight)) _tonight = fits[_rng.nextInt(fits.length)];
+    return matchFor(_tonight!);
+  }
+
+  void shuffleTonight() {
+    final fits = recipes.where((r) => _fitsDiet(r) && r != _tonight).toList();
+    if (fits.isEmpty) return;
+    _tonight = fits[_rng.nextInt(fits.length)];
+    notifyListeners();
   }
 
   /// Marks a recipe as cooked: takes one of each used ingredient out of the

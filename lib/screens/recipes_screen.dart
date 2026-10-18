@@ -18,7 +18,7 @@ class RecipesScreen extends StatefulWidget {
 }
 
 class _RecipesScreenState extends State<RecipesScreen> {
-  int _tab = 0; // 0 = cook now, 1 = missing 1–2, 2 = online
+  int _tab = 0; // 0 = cook now, 1 = missing 1–2, 2 = other recipes (TheMealDB)
   Future<List<OnlineRecipe>>? _online;
   String _onlineKey = '';
 
@@ -54,10 +54,12 @@ class _RecipesScreenState extends State<RecipesScreen> {
           Text('Recipes for you', style: heading(24, color: W2T.butter)),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(Gap.page, 24, Gap.page, 120),
+      body: Column(
         children: [
-          // Segmented tabs
+          // Tabs + filters stay pinned; only the recipe list below scrolls.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(Gap.page, 24, Gap.page, 0),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Container(
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
@@ -65,7 +67,7 @@ class _RecipesScreenState extends State<RecipesScreen> {
               children: [
                 Expanded(child: _Segment('Cook now (${now.length})', _tab == 0, () => setState(() => _tab = 0))),
                 Expanded(child: _Segment('Almost (${almost.length})', _tab == 1, () => setState(() => _tab = 1))),
-                Expanded(child: _Segment('Online', _tab == 2, () => setState(() => _tab = 2))),
+                Expanded(child: _Segment('Other recipes', _tab == 2, () => setState(() => _tab = 2))),
               ],
             ),
           ),
@@ -74,8 +76,13 @@ class _RecipesScreenState extends State<RecipesScreen> {
             _Filter('My kitchen tools', _myTools, () => setState(() => _myTools = !_myTools)),
             _Filter('Under 20 min', _quick, () => setState(() => _quick = !_quick)),
           ]),
-          const SizedBox(height: 20),
-
+          const SizedBox(height: 12),
+            ]),
+          ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(Gap.page, 8, Gap.page, 120),
+              children: [
           if (_tab == 2)
             FutureBuilder<List<OnlineRecipe>>(
               future: _onlineFor(app.fridge.map((f) => f.ingredientId)),
@@ -98,8 +105,8 @@ class _RecipesScreenState extends State<RecipesScreen> {
                 final online = snap.data ?? [];
                 if (online.isEmpty) {
                   return const EmptyState(
-                    icon: Icons.public_rounded,
-                    title: 'No online recipes yet',
+                    icon: Icons.menu_book_rounded,
+                    title: 'No other recipes yet',
                     message: 'Add a few more ingredients to your fridge.',
                   );
                 }
@@ -129,6 +136,9 @@ class _RecipesScreenState extends State<RecipesScreen> {
           else
             for (final m in list)
               Padding(padding: const EdgeInsets.only(bottom: 12), child: _RecipeCard(match: m)),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -149,7 +159,10 @@ class _Segment extends StatelessWidget {
         height: 40,
         alignment: Alignment.center,
         decoration: BoxDecoration(color: active ? W2T.rust : Colors.transparent, borderRadius: BorderRadius.circular(12)),
-        child: Text(label, style: TextStyle(color: active ? Colors.white : W2T.ink, fontWeight: FontWeight.w600, fontSize: 13)),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(label, maxLines: 1, style: TextStyle(color: active ? Colors.white : W2T.ink, fontWeight: FontWeight.w600, fontSize: 13)),
+        ),
       ),
     );
   }

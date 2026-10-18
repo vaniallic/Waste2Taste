@@ -13,6 +13,7 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
+  final _pc = PageController();
   int _page = 0;
 
   static const _copy = [
@@ -23,10 +24,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   void _next() {
     if (_page < 2) {
-      setState(() => _page++);
+      _pc.nextPage(duration: const Duration(milliseconds: 450), curve: Curves.easeInOutCubic);
     } else {
       context.read<AppState>().finishOnboarding();
     }
+  }
+
+  @override
+  void dispose() {
+    _pc.dispose();
+    super.dispose();
   }
 
   @override
@@ -43,11 +50,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               child: Stack(
                 children: [
                   Positioned.fill(
-                    child: switch (_page) {
-                      0 => const _HeroLogo(),
-                      1 => const _HeroFridge(),
-                      _ => const _HeroCook(),
-                    },
+                    // Swipe or tap Next: the pictures slide sideways between slides.
+                    child: PageView(
+                      controller: _pc,
+                      onPageChanged: (i) => setState(() => _page = i),
+                      children: const [_HeroLogo(), _HeroFridge(), _HeroCook()],
+                    ),
                   ),
                   if (_page < 2)
                     Positioned(
@@ -77,7 +85,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 Row(
                   children: [
                     for (var i = 0; i < 3; i++)
-                      Container(
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOut,
                         margin: const EdgeInsets.only(right: 6),
                         width: i == _page ? 24 : 8,
                         height: 8,
@@ -89,9 +99,29 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   ],
                 ),
                 const SizedBox(height: 20),
-                Text(_copy[_page].$1, style: heading(28)),
-                const SizedBox(height: 10),
-                Text(_copy[_page].$2, style: const TextStyle(fontSize: 15, height: 1.5, color: Color(0xFF5B4A2E))),
+                // Text fades and slides in when the slide changes.
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 350),
+                  transitionBuilder: (child, anim) => FadeTransition(
+                    opacity: anim,
+                    child: SlideTransition(
+                      position: Tween(begin: const Offset(0.08, 0), end: Offset.zero).animate(anim),
+                      child: child,
+                    ),
+                  ),
+                  child: SizedBox(
+                    key: ValueKey(_page),
+                    width: double.infinity,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(_copy[_page].$1, style: heading(28)),
+                        const SizedBox(height: 10),
+                        Text(_copy[_page].$2, style: const TextStyle(fontSize: 15, height: 1.5, color: Color(0xFF5B4A2E))),
+                      ],
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 28),
                 FilledButton(
                   style: FilledButton.styleFrom(
