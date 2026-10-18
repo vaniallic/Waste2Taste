@@ -51,6 +51,9 @@ class ScannedIngredient {
   ScannedIngredient(this.id, this.name, this.known);
 }
 
+/// The backend said we're sending too many requests (HTTP 429).
+class TooManyRequests implements Exception {}
+
 class Api {
   /// Recipes from TheMealDB that use the ingredients in your fridge.
   static Future<List<OnlineRecipe>> recipesFor(Iterable<String> ingredientIds) async {
@@ -95,6 +98,7 @@ class Api {
           body: jsonEncode({'image': base64Encode(bytes), 'mime': mime}),
         )
         .timeout(const Duration(seconds: 40));
+    if (res.statusCode == 429) throw TooManyRequests();
     final body = jsonDecode(res.body) as Map<String, dynamic>;
     if (res.statusCode != 200) throw Exception(body['error'] ?? 'Scan failed');
     return [
