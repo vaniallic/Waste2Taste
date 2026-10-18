@@ -1,4 +1,5 @@
 import { cors } from './_cors.js';
+import { tooMany } from './_limit.js';
 
 // GET /api/recipes?ingredients=egg,rice,chicken
 // Finds TheMealDB recipes that use the most of your ingredients.
@@ -6,6 +7,8 @@ const MEALDB = 'https://www.themealdb.com/api/json/v1/1';
 
 export default async function handler(req, res) {
   if (cors(req, res)) return;
+  // One search = ~30 calls to TheMealDB, so keep it polite: 40 per IP every 10 minutes.
+  if (tooMany(req, res, { name: 'recipes', max: 40, windowMs: 10 * 60 * 1000 })) return;
 
   const ingredients = String(req.query.ingredients || '')
     .split(',')
