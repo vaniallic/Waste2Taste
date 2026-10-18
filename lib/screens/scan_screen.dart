@@ -44,7 +44,9 @@ class _ScanScreenState extends State<ScanScreen> {
         _picked.addAll(found.where((f) => f.known).map((f) => f.id));
       });
     } catch (e) {
-      setState(() => _error = 'Couldn\'t read the photo. Try again with better light.');
+      setState(() => _error = e is TooManyRequests
+          ? 'You scanned a lot in a short time. Wait a few minutes, or pick from the list.'
+          : 'Couldn\'t read the photo. Try again with better light.');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
