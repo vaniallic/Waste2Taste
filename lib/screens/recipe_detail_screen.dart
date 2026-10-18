@@ -42,16 +42,16 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
                   top: top + 70,
                   left: 0,
                   right: 0,
-                  child: Center(child: Container(width: 280, height: 280, decoration: const BoxDecoration(color: W2T.rustSoft, shape: BoxShape.circle))),
+                  child: Center(child: Container(width: 280, height: 280, decoration: const BoxDecoration(color: W2T.rust, shape: BoxShape.circle))),
                 ),
                 Positioned(top: top + 50, left: 0, right: 0, child: Center(child: FoodImage(r.image, size: 270, turns: -0.14))),
-                Positioned(top: top + 8, left: 16, child: const CircleBack()),
+                Positioned(top: top + 8, left: Gap.page, child: const CircleBack()),
                 const SizedBox(height: 360, width: double.infinity),
               ],
             ),
           ),
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(22, 24, 22, 140),
+            padding: const EdgeInsets.fromLTRB(Gap.page, 24, Gap.page, 140),
             sliver: SliverList.list(
               children: [
                 Text(r.name, style: heading(26)),
@@ -102,7 +102,7 @@ class _RecipeDetailScreenState extends State<RecipeDetailScreen> {
         ],
       ),
       bottomNavigationBar: Container(
-        padding: EdgeInsets.fromLTRB(20, 16, 20, 16 + MediaQuery.paddingOf(context).bottom),
+        padding: EdgeInsets.fromLTRB(Gap.page, 16, Gap.page, 16 + MediaQuery.paddingOf(context).bottom),
         decoration: const BoxDecoration(color: W2T.olive, borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
         child: Row(
           children: [

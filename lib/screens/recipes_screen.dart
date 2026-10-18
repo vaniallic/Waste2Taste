@@ -5,6 +5,7 @@ import '../data/models.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import 'add_ingredients_screen.dart';
 import 'recipe_detail_screen.dart';
 
 class RecipesScreen extends StatefulWidget {
@@ -19,8 +20,6 @@ class _RecipesScreenState extends State<RecipesScreen> {
   bool _myTools = false;
   bool _quick = false;
 
-  static const _tints = [Color(0xFFF2C9A0), Color(0xFFE8B4A0), Color(0xFFD9C58A), Color(0xFFC9D3A8)];
-
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
@@ -31,89 +30,79 @@ class _RecipesScreenState extends State<RecipesScreen> {
     final list = _tab == 0 ? now : almost;
 
     return SheetLayout(
-      headerHeight: 96,
+      headerHeight: 120,
       header: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          Text('Based on your ${app.fridge.length} ingredients', style: const TextStyle(color: Color(0xFFF8E7C2), fontSize: 13)),
-          Text('Recipes for you', style: heading(26, color: W2T.butter)),
+          Text('From your ${app.fridge.length} ingredients', style: const TextStyle(color: Color(0xFFF8E7C2), fontSize: 14)),
+          const SizedBox(height: 2),
+          Text('Recipes for you', style: heading(24, color: W2T.butter)),
         ],
       ),
-      body: CustomScrollView(
-        slivers: [
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
-            sliver: SliverToBoxAdapter(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(children: [
-                    _TabPill('Cook now · ${now.length}', _tab == 0, () => setState(() => _tab = 0)),
-                    const SizedBox(width: 8),
-                    _TabPill('Missing 1–2 · ${almost.length}', _tab == 1, () => setState(() => _tab = 1)),
-                  ]),
-                  const SizedBox(height: 10),
-                  Wrap(spacing: 6, children: [
-                    _Filter('My kitchen tools', _myTools, () => setState(() => _myTools = !_myTools)),
-                    _Filter('Under 20 min', _quick, () => setState(() => _quick = !_quick)),
-                  ]),
-                ],
-              ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(Gap.page, 24, Gap.page, 120),
+        children: [
+          // Segmented tabs
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+            child: Row(
+              children: [
+                Expanded(child: _Segment('Cook now (${now.length})', _tab == 0, () => setState(() => _tab = 0))),
+                Expanded(child: _Segment('Missing 1–2 (${almost.length})', _tab == 1, () => setState(() => _tab = 1))),
+              ],
             ),
           ),
+          const SizedBox(height: 12),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            _Filter('My kitchen tools', _myTools, () => setState(() => _myTools = !_myTools)),
+            _Filter('Under 20 min', _quick, () => setState(() => _quick = !_quick)),
+          ]),
+          const SizedBox(height: 20),
+
           if (list.isEmpty)
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Text(
-                  _tab == 0 ? 'Nothing you can cook right now.\nCheck "Missing 1–2" or add more ingredients.' : 'No close matches yet.',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: W2T.muted),
-                ),
-              ),
-            )
+            _tab == 0
+                ? EmptyState(
+                    icon: Icons.restaurant_menu_rounded,
+                    title: 'Nothing ready to cook yet',
+                    message: almost.isEmpty
+                        ? 'Add a few more ingredients and recipes will show up here.'
+                        : 'You\'re close! ${almost.length} recipe${almost.length == 1 ? ' needs' : 's need'} just 1–2 more ingredients.',
+                    button: almost.isEmpty ? 'Add ingredients' : 'See what\'s missing',
+                    onButton: almost.isEmpty
+                        ? () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddIngredientsScreen()))
+                        : () => setState(() => _tab = 1),
+                  )
+                : const EmptyState(
+                    icon: Icons.search_off_rounded,
+                    title: 'No close matches',
+                    message: 'Try turning off the filters, or add more ingredients.',
+                  )
           else
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(20, 44, 20, 120),
-              sliver: SliverGrid(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  mainAxisSpacing: 44,
-                  crossAxisSpacing: 12,
-                  mainAxisExtent: 190,
-                ),
-                delegate: SliverChildBuilderDelegate(
-                  (_, i) => _RecipeCard(match: list[i], tint: _tints[i % _tints.length], turns: i.isEven ? -0.1 : 0.08),
-                  childCount: list.length,
-                ),
-              ),
-            ),
+            for (final m in list)
+              Padding(padding: const EdgeInsets.only(bottom: 12), child: _RecipeCard(match: m)),
         ],
       ),
     );
   }
 }
 
-class _TabPill extends StatelessWidget {
+class _Segment extends StatelessWidget {
   final String label;
   final bool active;
   final VoidCallback onTap;
-  const _TabPill(this.label, this.active, this.onTap);
+  const _Segment(this.label, this.active, this.onTap);
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: active ? W2T.rust : Colors.transparent,
-      shape: const StadiumBorder(side: BorderSide(color: W2T.rust, width: 1.5)),
-      child: InkWell(
-        customBorder: const StadiumBorder(),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          child: Text(label, style: TextStyle(color: active ? Colors.white : W2T.rust, fontWeight: FontWeight.w600, fontSize: 13)),
-        ),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 40,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(color: active ? W2T.rust : Colors.transparent, borderRadius: BorderRadius.circular(12)),
+        child: Text(label, style: TextStyle(color: active ? Colors.white : W2T.ink, fontWeight: FontWeight.w600, fontSize: 13)),
       ),
     );
   }
@@ -141,51 +130,45 @@ class _Filter extends StatelessWidget {
   }
 }
 
+/// Horizontal recipe card: text on the left, dish photo on the right.
 class _RecipeCard extends StatelessWidget {
   final RecipeMatch match;
-  final Color tint;
-  final double turns;
-  const _RecipeCard({required this.match, required this.tint, required this.turns});
+  const _RecipeCard({required this.match});
 
   @override
   Widget build(BuildContext context) {
     final r = match.recipe;
     final ready = match.canCookNow;
-    return GestureDetector(
+    return AppCard(
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => RecipeDetailScreen(recipe: r))),
-      child: Stack(
-        clipBehavior: Clip.none,
+      padding: const EdgeInsets.fromLTRB(Gap.card, Gap.card, 8, Gap.card),
+      child: Row(
         children: [
-          Container(
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
-            clipBehavior: Clip.antiAlias,
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(height: 70, color: tint),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 30, 12, 0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(r.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, height: 1.25)),
-                      const SizedBox(height: 3),
-                      Text('${r.minutes} min · ${r.tool.label}', style: const TextStyle(fontSize: 11, color: W2T.muted)),
-                      const SizedBox(height: 6),
-                      ready
-                          ? Tag('You have ${match.haveRequiredCount}/${match.requiredCount}')
-                          : Tag('Missing: ${ingredientNames(match.missing.map((m) => m.ingredientId))}', bg: W2T.rustTint, fg: const Color(0xFF8A2A12)),
-                    ],
-                  ),
-                ),
+                Text(r.name, style: heading(17)),
+                const SizedBox(height: 4),
+                Text('${r.minutes} min · ${r.tool.label}', style: const TextStyle(fontSize: 12, color: W2T.muted)),
+                const SizedBox(height: 10),
+                ready
+                    ? Tag('You have ${match.haveRequiredCount}/${match.requiredCount}')
+                    : Tag('Missing: ${ingredientNames(match.missing.map((m) => m.ingredientId))}', bg: W2T.rustTint, fg: const Color(0xFF8A2A12)),
+                if (match.savesIds.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text('Uses your ${ingredientNames(match.savesIds)}', style: const TextStyle(fontSize: 12, color: W2T.olive, fontWeight: FontWeight.w600)),
+                ],
               ],
             ),
           ),
-          Positioned(
-            top: -40,
-            left: 0,
-            right: 0,
-            child: Center(child: FoodImage(r.image, size: 128, turns: turns)),
+          const SizedBox(width: 8),
+          Container(
+            width: 96,
+            height: 96,
+            decoration: const BoxDecoration(color: W2T.cream, shape: BoxShape.circle),
+            alignment: Alignment.center,
+            child: Image.asset(r.image, width: 92, height: 92, fit: BoxFit.contain),
           ),
         ],
       ),

@@ -26,6 +26,22 @@ class Waste2TasteApp extends StatelessWidget {
       title: 'Waste2Taste',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
+      // Keep the app phone-sized on wide screens (Chrome/desktop), centered with equal margins.
+      builder: (context, child) => ColoredBox(
+        color: const Color(0xFF2B1A12),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 430),
+            child: ClipRect(
+              // Slightly smaller text so content fits a phone screen better.
+              child: MediaQuery(
+                data: MediaQuery.of(context).copyWith(textScaler: const TextScaler.linear(0.9)),
+                child: child!,
+              ),
+            ),
+          ),
+        ),
+      ),
       home: const _Start(),
     );
   }

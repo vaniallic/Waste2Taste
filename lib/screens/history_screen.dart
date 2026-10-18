@@ -23,36 +23,35 @@ class HistoryScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
     return SheetLayout(
-      headerHeight: 64,
+      headerHeight: 120,
       header: Align(alignment: Alignment.bottomLeft, child: Text('History', style: heading(28, color: W2T.butter))),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 22, 20, 120),
+        padding: const EdgeInsets.fromLTRB(Gap.page, 28, Gap.page, 120),
         children: [
           Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(color: W2T.olive, borderRadius: BorderRadius.circular(24)),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(color: W2T.olive, borderRadius: BorderRadius.circular(20)),
             child: Row(children: [
               Expanded(child: _Stat('${app.history.length}', 'meals cooked')),
               Expanded(child: _Stat('${app.totalSaved}', 'ingredients saved from the bin')),
             ]),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: Gap.section),
+          if (app.history.isNotEmpty) ...[const SectionTitle('Recent'), const SizedBox(height: 12)],
           if (app.history.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: Text('Nothing here yet. Cook something and tap "Mark cooked" to start your history.',
-                  textAlign: TextAlign.center, style: TextStyle(color: W2T.muted)),
+            const EmptyState(
+              icon: Icons.history_rounded,
+              title: 'No meals yet',
+              message: 'Cook a recipe and tap "Mark cooked" — it will show up here with the ingredients you saved.',
             )
           else
             for (final h in app.history)
               if (recipesById[h.recipeId] case final r?)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: Material(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
+                  child: AppCard(
+                    padding: EdgeInsets.zero,
                     child: InkWell(
-                      borderRadius: BorderRadius.circular(20),
                       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => RecipeDetailScreen(recipe: r))),
                       child: SizedBox(
                         height: 76,

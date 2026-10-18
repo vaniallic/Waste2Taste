@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../state/app_state.dart';
 import '../theme.dart';
+import '../widgets/common.dart';
 
 /// Demo sign-in: no server yet, it just remembers your name on the phone.
 /// (Real accounts with Firebase/Supabase can come later.)
@@ -50,7 +51,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             Container(
               constraints: BoxConstraints(minHeight: MediaQuery.sizeOf(context).height - 230 - top),
-              padding: const EdgeInsets.fromLTRB(28, 32, 28, 32),
+              padding: const EdgeInsets.fromLTRB(Gap.page, 32, Gap.page, 32),
               decoration: const BoxDecoration(color: W2T.butter, borderRadius: BorderRadius.vertical(top: Radius.circular(36))),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -12,8 +12,8 @@ class ScanScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SheetLayout(
-      headerHeight: 64,
-      header: Row(children: [const CircleBack(), const SizedBox(width: 12), Text('Scan Ingredients', style: heading(24, color: W2T.butter))]),
+      headerHeight: 100,
+      header: Row(children: [const CircleBack(), const SizedBox(width: 12), Text('Scan ingredients', style: heading(22, color: W2T.butter))]),
       body: Padding(
         padding: const EdgeInsets.all(28),
         child: Column(

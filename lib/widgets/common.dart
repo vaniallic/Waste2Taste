@@ -11,8 +11,16 @@ class SheetLayout extends StatelessWidget {
   final Widget body;
   final double headerHeight;
   final Widget? bottom;
+  final Alignment headerAlign;
 
-  const SheetLayout({super.key, required this.header, required this.body, this.headerHeight = 130, this.bottom});
+  const SheetLayout({
+    super.key,
+    required this.header,
+    required this.body,
+    this.headerHeight = 130,
+    this.bottom,
+    this.headerAlign = Alignment.bottomLeft,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -22,8 +30,12 @@ class SheetLayout extends StatelessWidget {
       body: Column(
         children: [
           SizedBox(
+            width: double.infinity,
             height: headerHeight + top,
-            child: Padding(padding: EdgeInsets.fromLTRB(20, top + 8, 20, 16), child: header),
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(Gap.page, top + 20, Gap.page, 24),
+              child: Align(alignment: headerAlign, child: header),
+            ),
           ),
           Expanded(
             child: Container(
@@ -117,7 +129,7 @@ String ingredientNames(Iterable<String> ids) =>
 
 /// Spacing used everywhere, so every screen lines up the same way.
 class Gap {
-  static const page = 20.0; // left/right padding of every screen
+  static const page = 24.0; // left/right padding of every screen
   static const card = 16.0; // padding inside cards
   static const section = 28.0; // space between sections
 }

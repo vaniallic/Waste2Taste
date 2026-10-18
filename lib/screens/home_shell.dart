@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme.dart';
+import '../widgets/common.dart';
 import 'history_screen.dart';
 import 'home_screen.dart';
 import 'profile_screen.dart';
@@ -37,7 +38,7 @@ class HomeShellState extends State<HomeShell> {
         children: const [HomeScreen(), RecipesScreen(), HistoryScreen(), ProfileScreen()],
       ),
       bottomNavigationBar: SafeArea(
-        minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        minimum: const EdgeInsets.fromLTRB(Gap.page, 0, Gap.page, 12),
         child: Container(
           height: 64,
           decoration: BoxDecoration(

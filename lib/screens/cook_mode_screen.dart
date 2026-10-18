@@ -76,7 +76,7 @@ class _CookModeScreenState extends State<CookModeScreen> {
       body: Column(
         children: [
           Padding(
-            padding: EdgeInsets.fromLTRB(16, top + 8, 20, 0),
+            padding: EdgeInsets.fromLTRB(20, top + 8, 24, 0),
             child: Row(children: [
               Material(
                 color: W2T.butter,
@@ -88,7 +88,7 @@ class _CookModeScreenState extends State<CookModeScreen> {
             ]),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 22),
+            padding: const EdgeInsets.fromLTRB(24, 18, 24, 22),
             child: Row(children: [
               for (var i = 0; i < _steps.length; i++)
                 Expanded(

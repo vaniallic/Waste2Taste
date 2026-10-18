@@ -21,64 +21,81 @@ class HomeScreen extends StatelessWidget {
     final readyCount = app.matches().where((m) => m.canCookNow).length;
 
     return SheetLayout(
-      headerHeight: 96,
+      headerHeight: 120,
       header: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          Text('Hi, ${app.userName ?? 'there'}!', style: const TextStyle(color: Color(0xFFF8E7C2), fontSize: 13)),
+          Text('Hi, ${app.userName ?? 'there'}', style: const TextStyle(color: Color(0xFFF8E7C2), fontSize: 14)),
+          const SizedBox(height: 2),
           Text("What's in your fridge?", style: heading(24, color: W2T.butter)),
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 120),
+        padding: const EdgeInsets.fromLTRB(Gap.page, 24, Gap.page, 120),
         children: [
+          // Quick actions
           Row(
             children: [
               Expanded(
-                child: _ActionTile(
-                  icon: Icons.add_circle_outline_rounded,
-                  label: 'Add Ingredients',
+                child: _ActionCard(
+                  icon: Icons.add_rounded,
+                  title: 'Add',
+                  subtitle: 'Pick from list',
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddIngredientsScreen())),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _ActionTile(
-                  icon: Icons.document_scanner_outlined,
-                  label: 'Scan Ingredients',
+                child: _ActionCard(
+                  icon: Icons.photo_camera_outlined,
+                  title: 'Scan',
+                  subtitle: 'Use camera',
                   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ScanScreen())),
                 ),
               ),
             ],
           ),
+
+          // Tonight's pick
           if (pick != null) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: Gap.section),
+            const SectionTitle('Cook tonight'),
+            const SizedBox(height: 12),
             _TonightCard(
               name: pick.recipe.name,
               image: pick.recipe.image,
-              subtitle: pick.savesIds.isEmpty ? '${pick.recipe.minutes} min · you have everything' : 'Saves your ${ingredientNames(pick.savesIds)}',
+              minutes: pick.recipe.minutes,
+              saves: pick.savesIds.isEmpty ? null : ingredientNames(pick.savesIds),
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => RecipeDetailScreen(recipe: pick.recipe))),
             ),
           ],
-          const SizedBox(height: 20),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(child: Text('My Fridge', style: heading(20))),
-              const Text('Use the red ones first', style: TextStyle(fontSize: 12, color: W2T.brownText)),
-            ],
-          ),
+
+          // Fridge
+          const SizedBox(height: Gap.section),
+          SectionTitle('My fridge · ${items.length}',
+              action: items.isEmpty ? null : 'See recipes', onAction: () => HomeShell.of(context)?.goTo(1)),
+          const SizedBox(height: 4),
+          if (items.isNotEmpty)
+            const Text('Items that spoil first are on top.', style: TextStyle(fontSize: 13, color: W2T.muted)),
           const SizedBox(height: 12),
           if (items.isEmpty)
-            const _EmptyFridge()
+            EmptyState(
+              icon: Icons.kitchen_outlined,
+              title: 'Your fridge is empty',
+              message: 'Add what you have and we\'ll find recipes you can cook right now.',
+              button: 'Add ingredients',
+              onButton: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddIngredientsScreen())),
+            )
           else
-            for (final item in items) _FridgeRow(id: item.ingredientId),
+            for (final item in items)
+              Padding(padding: const EdgeInsets.only(bottom: 10), child: _FridgeRow(id: item.ingredientId)),
+
           if (items.isNotEmpty) ...[
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             FilledButton(
               onPressed: () => HomeShell.of(context)?.goTo(1),
-              child: Text('Find recipes · $readyCount ready'),
+              child: Text(readyCount == 0 ? 'Find recipes' : 'Find recipes · $readyCount ready'),
             ),
           ],
         ],
@@ -87,31 +104,36 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-class _ActionTile extends StatelessWidget {
+class _ActionCard extends StatelessWidget {
   final IconData icon;
-  final String label;
+  final String title;
+  final String subtitle;
   final VoidCallback onTap;
-  const _ActionTile({required this.icon, required this.label, required this.onTap});
+  const _ActionCard({required this.icon, required this.title, required this.subtitle, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: W2T.rust,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: onTap,
-        child: SizedBox(
-          height: 64,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: W2T.butter, size: 22),
-              const SizedBox(width: 8),
-              Flexible(child: Text(label, style: const TextStyle(color: W2T.butter, fontWeight: FontWeight.w600, fontSize: 14))),
-            ],
+    return AppCard(
+      onTap: onTap,
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(color: W2T.rust, borderRadius: BorderRadius.circular(12)),
+            child: Icon(icon, color: W2T.butter, size: 22),
           ),
-        ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                Text(subtitle, style: const TextStyle(fontSize: 12, color: W2T.muted)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -120,38 +142,35 @@ class _ActionTile extends StatelessWidget {
 class _TonightCard extends StatelessWidget {
   final String name;
   final String image;
-  final String subtitle;
+  final int minutes;
+  final String? saves;
   final VoidCallback onTap;
-  const _TonightCard({required this.name, required this.image, required this.subtitle, required this.onTap});
+  const _TonightCard({required this.name, required this.image, required this.minutes, required this.saves, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Material(
+    return AppCard(
       color: W2T.olive,
-      borderRadius: BorderRadius.circular(22),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: SizedBox(
-          height: 84,
-          child: Row(
-            children: [
-              Transform.translate(offset: const Offset(-10, 0), child: FoodImage(image, size: 96, turns: -0.17)),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('COOK TONIGHT', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFFE9B48F), letterSpacing: .5)),
-                    Text(name, style: heading(17, color: W2T.butter)),
-                    Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: W2T.oliveSoft)),
-                  ],
-                ),
-              ),
-              const Padding(padding: EdgeInsets.only(right: 14), child: Icon(Icons.chevron_right_rounded, color: W2T.butter)),
-            ],
+      onTap: onTap,
+      padding: const EdgeInsets.fromLTRB(Gap.card, Gap.card, 8, Gap.card),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name, style: heading(20, color: W2T.butter)),
+                const SizedBox(height: 4),
+                Text('$minutes min', style: const TextStyle(fontSize: 13, color: W2T.oliveSoft)),
+                if (saves != null) ...[
+                  const SizedBox(height: 10),
+                  Tag('Uses your $saves', bg: W2T.butter, fg: W2T.olive),
+                ],
+              ],
+            ),
           ),
-        ),
+          FoodImage(image, size: 104),
+        ],
       ),
     );
   }
@@ -168,50 +187,45 @@ class _FridgeRow extends StatelessWidget {
     if (item == null) return const SizedBox.shrink();
     final label = expiryLabel(item);
     final ing = catalogById[id];
+
     return Dismissible(
       key: ValueKey(id),
       direction: DismissDirection.endToStart,
       background: Container(
-        margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.only(right: 20),
         alignment: Alignment.centerRight,
-        decoration: BoxDecoration(color: W2T.rust, borderRadius: BorderRadius.circular(18)),
+        decoration: BoxDecoration(color: W2T.rust, borderRadius: BorderRadius.circular(20)),
         child: const Icon(Icons.delete_outline_rounded, color: Colors.white),
       ),
       onDismissed: (_) => app.removeIngredient(id),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        height: 64,
-        padding: const EdgeInsets.only(left: 8),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)),
+      child: AppCard(
+        padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
         child: Row(
           children: [
-            IngredientImage(id, size: 46),
-            const SizedBox(width: 12),
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(color: W2T.cream, borderRadius: BorderRadius.circular(14)),
+              alignment: Alignment.center,
+              child: IngredientImage(id, size: 40),
+            ),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(ing?.name ?? id, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                  Text(ing?.name ?? id, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                  const SizedBox(height: 2),
                   Text(label.text,
-                      style: TextStyle(fontSize: 11, color: label.urgent ? W2T.danger : W2T.muted, fontWeight: label.urgent ? FontWeight.w600 : FontWeight.w400)),
+                      style: TextStyle(fontSize: 12, color: label.urgent ? W2T.danger : W2T.muted, fontWeight: label.urgent ? FontWeight.w600 : FontWeight.w400)),
                 ],
               ),
             ),
-            IconButton(
-              tooltip: 'Less ${ing?.name}',
-              onPressed: () => item.qty == 1 ? _confirmRemove(context, app, id) : app.changeQty(id, -1),
-              icon: const Icon(Icons.remove_rounded, color: W2T.rust),
+            _Stepper(
+              qty: item.qty,
+              onMinus: () => item.qty == 1 ? _confirmRemove(context, app, id) : app.changeQty(id, -1),
+              onPlus: () => app.changeQty(id, 1),
             ),
-            Container(
-              constraints: const BoxConstraints(minWidth: 28),
-              height: 28,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(color: W2T.butter, borderRadius: BorderRadius.circular(8)),
-              child: Text('${item.qty}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-            ),
-            IconButton(tooltip: 'More ${ing?.name}', onPressed: () => app.changeQty(id, 1), icon: const Icon(Icons.add_rounded, color: W2T.rust)),
           ],
         ),
       ),
@@ -239,20 +253,23 @@ class _FridgeRow extends StatelessWidget {
   }
 }
 
-class _EmptyFridge extends StatelessWidget {
-  const _EmptyFridge();
+/// Compact − qty + control in one pill.
+class _Stepper extends StatelessWidget {
+  final int qty;
+  final VoidCallback onMinus;
+  final VoidCallback onPlus;
+  const _Stepper({required this.qty, required this.onMinus, required this.onPlus});
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(color: W2T.cream, borderRadius: BorderRadius.circular(20)),
-      child: const Column(
+      decoration: BoxDecoration(color: W2T.cream, borderRadius: BorderRadius.circular(22)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.kitchen_outlined, size: 40, color: W2T.rust),
-          SizedBox(height: 8),
-          Text('Your fridge is empty', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-          SizedBox(height: 4),
-          Text('Add or scan what you have to get recipe ideas.', textAlign: TextAlign.center, style: TextStyle(color: W2T.muted)),
+          IconButton(onPressed: onMinus, icon: const Icon(Icons.remove_rounded, size: 18, color: W2T.rust), tooltip: 'Less'),
+          SizedBox(width: 20, child: Text('$qty', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w700))),
+          IconButton(onPressed: onPlus, icon: const Icon(Icons.add_rounded, size: 18, color: W2T.rust), tooltip: 'More'),
         ],
       ),
     );
