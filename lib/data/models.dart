@@ -2,13 +2,24 @@
 class Ingredient {
   final String id;
   final String name;
-  final String? image; // asset path, or null to show the initials
+  final String? image; // asset path, web link (http...), or null to show the initials
   final String category; // Protein, Veggies, Carbs, Sauces, Dairy, Pantry
   final int shelfDays; // rough days it keeps in the fridge after adding
 
   const Ingredient({required this.id, required this.name, this.image, required this.category, required this.shelfDays});
 
   bool get isPantry => shelfDays >= 180;
+
+  // Used to save ingredients that came from the online list (see AppState.customIngredients).
+  Map<String, dynamic> toJson() => {'id': id, 'name': name, 'image': image, 'category': category, 'shelf': shelfDays};
+
+  factory Ingredient.fromJson(Map<String, dynamic> j) => Ingredient(
+        id: j['id'] as String,
+        name: j['name'] as String,
+        image: j['image'] as String?,
+        category: j['category'] as String,
+        shelfDays: (j['shelf'] as num).toInt(),
+      );
 }
 
 /// One ingredient sitting in the user's fridge.
