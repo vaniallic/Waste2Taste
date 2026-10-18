@@ -1,11 +1,14 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:firebase_auth/firebase_auth.dart' show User;
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/models.dart';
 import '../data/sample_data.dart';
+import '../services/auth.dart';
 
 /// All app data lives here. Screens read it with `context.watch<AppState>()`
 /// and change it by calling the methods below. Everything is saved on the
@@ -51,6 +54,7 @@ class AppState extends ChangeNotifier {
     }
     // First launch: the fridge starts empty. After that it only holds what the
     // user added, minus what each cooked recipe used (see markCooked).
+    await _syncAuth();
     loaded = true;
     notifyListeners();
   }
@@ -83,6 +87,40 @@ class AppState extends ChangeNotifier {
     _changed();
   }
 
+  StreamSubscription<User?>? _authSub;
+
+  /// With Firebase on, who is logged in comes from Firebase, not from the saved name.
+  Future<void> _syncAuth() async {
+    if (!Auth.ready) return;
+    // The first event says who is logged in (the web needs a moment to restore the session).
+    final first = await Auth.changes.first.timeout(const Duration(seconds: 4), onTimeout: () => Auth.user);
+    userName = first == null ? null : _nameOf(first);
+    _authSub = Auth.changes.listen((u) {
+      final name = u == null ? null : _nameOf(u);
+      if (name == userName) return;
+      userName = name;
+      _changed();
+    });
+  }
+
+  static String _nameOf(User u) {
+    final n = u.displayName?.trim();
+    if (n != null && n.isNotEmpty) return n;
+    final email = u.email;
+    if (email != null && email.contains('@')) {
+      final p = email.split('@').first;
+      if (p.isNotEmpty) return p[0].toUpperCase() + p.substring(1);
+    }
+    return 'Friend';
+  }
+
+  @override
+  void dispose() {
+    _authSub?.cancel();
+    super.dispose();
+  }
+
+  /// Simple login used when Firebase isn't set up: just remembers a name on the device.
   void signIn(String name) {
     userName = name.trim().isEmpty ? 'Friend' : name.trim();
     _changed();
@@ -91,6 +129,7 @@ class AppState extends ChangeNotifier {
   void updateProfile({required String name, Uint8List? newPhoto}) {
     userName = name.trim().isEmpty ? 'Friend' : name.trim();
     photo = newPhoto;
+    if (Auth.ready) Auth.user?.updateDisplayName(userName).catchError((_) {});
     _changed();
     _savePhoto();
   }
@@ -106,6 +145,7 @@ class AppState extends ChangeNotifier {
 
   void signOut() {
     userName = null;
+    Auth.signOut();
     _changed();
   }
 
