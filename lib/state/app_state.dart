@@ -20,6 +20,11 @@ class AppState extends ChangeNotifier {
   Set<String> diet = {'Halal'};
   Set<Tool> tools = {Tool.stove, Tool.riceCooker};
 
+  /// Ingredients added from the online list. They are not in sample_data.dart,
+  /// so we save them ourselves and put them back into catalogById on load.
+  final Map<String, Ingredient> customIngredients = {};
+  static final _builtIn = {for (final i in catalog) i.id};
+
   static const _key = 'w2t_state_v1';
   static const _photoKey = 'w2t_photo_v1';
 
@@ -38,6 +43,11 @@ class AppState extends ChangeNotifier {
       history = (j['history'] as List).map((e) => CookedEntry.fromJson(e as Map<String, dynamic>)).toList();
       diet = Set<String>.from(j['diet'] as List);
       tools = (j['tools'] as List).map((t) => Tool.values.byName(t as String)).toSet();
+      for (final e in (j['custom'] as List? ?? [])) {
+        final ing = Ingredient.fromJson(e as Map<String, dynamic>);
+        customIngredients[ing.id] = ing;
+        catalogById.putIfAbsent(ing.id, () => ing);
+      }
     }
     // First launch: the fridge starts empty. After that it only holds what the
     // user added, minus what each cooked recipe used (see markCooked).
@@ -56,6 +66,7 @@ class AppState extends ChangeNotifier {
         'history': history.map((h) => h.toJson()).toList(),
         'diet': diet.toList(),
         'tools': tools.map((t) => t.name).toList(),
+        'custom': customIngredients.values.map((i) => i.toJson()).toList(),
       }),
     );
   }
@@ -108,6 +119,9 @@ class AppState extends ChangeNotifier {
   void addIngredients(Iterable<String> ids) {
     final now = DateTime.now();
     for (final id in ids) {
+      // An ingredient from the online list: remember it so it still has a name and photo next time.
+      final known = catalogById[id];
+      if (known != null && !_builtIn.contains(id)) customIngredients[id] = known;
       final existing = fridge.where((f) => f.ingredientId == id);
       if (existing.isNotEmpty) {
         existing.first.qty++;
