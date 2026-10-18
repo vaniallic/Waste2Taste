@@ -1,4 +1,5 @@
 import { cors } from './_cors.js';
+import { tooMany } from './_limit.js';
 
 // POST /api/scan   body: { "image": "<base64>", "mime": "image/jpeg" }
 // Sends the photo to Gemini and returns the ingredients it sees.
@@ -22,12 +23,17 @@ export default async function handler(req, res) {
   if (cors(req, res)) return;
   if (req.method !== 'POST') return res.status(405).json({ error: 'Use POST' });
 
+  // Each scan costs a Gemini call, so cap it: 10 scans per IP every 10 minutes.
+  if (tooMany(req, res, { name: 'scan', max: 10, windowMs: 10 * 60 * 1000 })) return;
+
   const key = process.env.GEMINI_API_KEY;
   if (!key) return res.status(500).json({ error: 'GEMINI_API_KEY is not set on the server' });
 
   const { image, mime = 'image/jpeg' } = req.body || {};
   if (!image || typeof image !== 'string') return res.status(400).json({ error: 'Send { image: base64 }' });
-  if (image.length > 4_000_000) return res.status(413).json({ error: 'Image too big, use a smaller photo' });
+  // The app sends ~1024px photos (a few hundred KB), so 1.5 MB of base64 is plenty.
+  if (image.length > 1_500_000) return res.status(413).json({ error: 'Image too big, use a smaller photo' });
+  if (!['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'].includes(mime)) return res.status(415).json({ error: 'Use a jpeg, png, webp or heic photo' });
 
   try {
     const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
