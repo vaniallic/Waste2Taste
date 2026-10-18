@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../data/models.dart';
+import '../services/notifications.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
@@ -176,7 +177,34 @@ class ProfileScreen extends StatelessWidget {
               children: [
                 _MenuRow(Icons.person_outline_rounded, 'Edit profile', onTap: () => _editProfile(context)),
                 const Divider(height: 1, indent: 60, endIndent: 16, color: Color(0xFFEFE3C8)),
-                const _MenuRow(Icons.notifications_none_rounded, 'Expiry reminders'),
+                SwitchListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 2),
+                  secondary: const Icon(Icons.notifications_none_rounded, color: W2T.olive),
+                  title: const Text('Expiry reminders', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: W2T.ink)),
+                  subtitle: const Text('A heads-up the day before something goes bad', style: TextStyle(fontSize: 12, color: W2T.muted)),
+                  value: app.reminders,
+                  activeTrackColor: W2T.olive,
+                  onChanged: (on) async {
+                    final messenger = ScaffoldMessenger.of(context);
+                    final ok = await app.setReminders(on);
+                    if (on && !ok) {
+                      messenger.showSnackBar(SnackBar(
+                        content: Text(Reminders.supported
+                            ? 'Notifications are off for Waste2Taste. Turn them on in your phone settings.'
+                            : 'Reminders work in the phone app, not in the browser.'),
+                      ));
+                    }
+                  },
+                ),
+                // Only while developing: sends a notification right now.
+                if (kDebugMode) ...[
+                  const Divider(height: 1, indent: 60, endIndent: 16, color: Color(0xFFEFE3C8)),
+                  _MenuRow(Icons.bolt_rounded, 'Send test reminder', onTap: () async {
+                    final messenger = ScaffoldMessenger.of(context);
+                    final ok = await Reminders.sendTest();
+                    messenger.showSnackBar(SnackBar(content: Text(ok ? 'Sent. Check your notifications.' : 'Couldn\'t send (no permission, or on the web).')));
+                  }),
+                ],
                 const Divider(height: 1, indent: 60, endIndent: 16, color: Color(0xFFEFE3C8)),
                 const _MenuRow(Icons.language_rounded, 'Language'),
               ],
