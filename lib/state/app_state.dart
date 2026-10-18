@@ -37,9 +37,9 @@ class AppState extends ChangeNotifier {
       history = (j['history'] as List).map((e) => CookedEntry.fromJson(e as Map<String, dynamic>)).toList();
       diet = Set<String>.from(j['diet'] as List);
       tools = (j['tools'] as List).map((t) => Tool.values.byName(t as String)).toSet();
-    } else {
-      _seedDemoFridge();
     }
+    // First launch: the fridge starts empty. After that it only holds what the
+    // user added, minus what each cooked recipe used (see markCooked).
     loaded = true;
     notifyListeners();
   }
@@ -62,19 +62,6 @@ class AppState extends ChangeNotifier {
   void _changed() {
     notifyListeners();
     _save();
-  }
-
-  /// A few items so the app isn't empty the first time it opens.
-  void _seedDemoFridge() {
-    final now = DateTime.now();
-    fridge = [
-      FridgeItem(ingredientId: 'tomato', qty: 2, expiresAt: now.add(const Duration(days: 2))),
-      FridgeItem(ingredientId: 'rice', qty: 1, expiresAt: now),
-      FridgeItem(ingredientId: 'egg', qty: 3, expiresAt: now.add(const Duration(days: 9))),
-      FridgeItem(ingredientId: 'chicken', qty: 1, expiresAt: now.add(const Duration(days: 2))),
-      FridgeItem(ingredientId: 'soy_sauce', qty: 1, expiresAt: now.add(const Duration(days: 365))),
-      FridgeItem(ingredientId: 'garlic', qty: 1, expiresAt: now.add(const Duration(days: 20))),
-    ];
   }
 
   // ---------- account ----------
