@@ -44,13 +44,18 @@ class RecipeStep {
   const RecipeStep(this.text, {this.timerSeconds});
 }
 
-enum Tool { stove, riceCooker, microwave }
+enum Tool { stove, riceCooker, microwave, oven, airFryer, blender, steamer, toaster }
 
 extension ToolLabel on Tool {
   String get label => switch (this) {
         Tool.stove => 'Stove',
         Tool.riceCooker => 'Rice cooker',
         Tool.microwave => 'Microwave',
+        Tool.oven => 'Oven',
+        Tool.airFryer => 'Air fryer',
+        Tool.blender => 'Blender',
+        Tool.steamer => 'Steamer',
+        Tool.toaster => 'Toaster',
       };
 }
 
