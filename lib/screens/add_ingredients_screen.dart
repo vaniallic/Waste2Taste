@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../data/models.dart';
 import '../data/sample_data.dart';
+import '../services/api.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
@@ -18,6 +22,53 @@ class _AddIngredientsScreenState extends State<AddIngredientsScreen> {
   String _query = '';
   String _category = 'All';
 
+  // More ingredients from the online list, searched while you type.
+  Timer? _debounce;
+  List<Ingredient> _remote = [];
+  bool _searching = false;
+  String? _remoteError;
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
+
+  void _onQuery(String v) {
+    setState(() => _query = v);
+    _debounce?.cancel();
+    final q = v.trim();
+    if (q.length < 2) {
+      setState(() {
+        _remote = [];
+        _searching = false;
+        _remoteError = null;
+      });
+      return;
+    }
+    _debounce = Timer(const Duration(milliseconds: 400), () => _search(q));
+  }
+
+  Future<void> _search(String q) async {
+    setState(() {
+      _searching = true;
+      _remoteError = null;
+    });
+    try {
+      final found = await Api.searchIngredients(q);
+      if (!mounted || q != _query.trim()) return;
+      // Register them so the tiles can show their name and photo.
+      for (final i in found) {
+        catalogById.putIfAbsent(i.id, () => i);
+      }
+      setState(() => _remote = found);
+    } catch (_) {
+      if (mounted && q == _query.trim()) setState(() => _remoteError = 'Couldn\'t load more ingredients. Check your connection.');
+    } finally {
+      if (mounted && q == _query.trim()) setState(() => _searching = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
@@ -25,6 +76,9 @@ class _AddIngredientsScreenState extends State<AddIngredientsScreen> {
     final list = catalog
         .where((i) => (_category == 'All' || i.category == _category) && (q.isEmpty || i.name.toLowerCase().contains(q)))
         .toList();
+    final localIds = catalog.map((i) => i.id).toSet();
+    final online = _remote.where((i) => !localIds.contains(i.id) && (_category == 'All' || i.category == _category)).toList();
+    final searchedOnline = q.length >= 2;
 
     return SheetLayout(
       headerHeight: 100,
@@ -39,7 +93,7 @@ class _AddIngredientsScreenState extends State<AddIngredientsScreen> {
         padding: const EdgeInsets.fromLTRB(Gap.page, 24, Gap.page, 24),
         children: [
           TextField(
-            onChanged: (v) => setState(() => _query = v),
+            onChanged: _onQuery,
             decoration: const InputDecoration(hintText: 'Search ingredients', prefixIcon: Icon(Icons.search_rounded, color: W2T.rust)),
           ),
           const SizedBox(height: 16),
@@ -65,31 +119,32 @@ class _AddIngredientsScreenState extends State<AddIngredientsScreen> {
           ),
           const SizedBox(height: Gap.section),
 
-          if (list.isEmpty)
-            EmptyState(icon: Icons.search_off_rounded, title: 'No match', message: 'Try another name or category.')
-          else
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: 0.82,
-              ),
-              itemCount: list.length,
-              itemBuilder: (_, i) {
-                final ing = list[i];
-                final on = _selected.contains(ing.id);
-                final have = app.inFridge(ing.id);
-                return _IngredientTile(
-                  id: ing.id,
-                  name: ing.name,
-                  selected: on,
-                  inFridge: have,
-                  onTap: () => setState(() => on ? _selected.remove(ing.id) : _selected.add(ing.id)),
-                );
-              },
+          if (list.isNotEmpty)
+            _grid(list, app)
+          else if (!searchedOnline || (!_searching && online.isEmpty))
+            const EmptyState(icon: Icons.search_off_rounded, title: 'No match', message: 'Try another name or category.'),
+
+          // Online ingredients (TheMealDB)
+          if (searchedOnline) ...[
+            const SizedBox(height: Gap.section),
+            const SectionTitle('More ingredients'),
+            const SizedBox(height: 12),
+            if (_searching)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: Center(child: CircularProgressIndicator(color: W2T.rust)),
+              )
+            else if (_remoteError != null)
+              Text(_remoteError!, style: const TextStyle(color: W2T.danger))
+            else if (online.isEmpty)
+              const Text('Nothing else found online.', style: TextStyle(color: W2T.muted))
+            else
+              _grid(online, app),
+          ] else if (_query.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: Gap.section),
+              child: Text('Can\'t find it? Type a name to search hundreds more ingredients online.',
+                  textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: W2T.muted)),
             ),
         ],
       ),
@@ -108,6 +163,30 @@ class _AddIngredientsScreenState extends State<AddIngredientsScreen> {
           ),
         ),
       ),
+    );
+  }
+  Widget _grid(List<Ingredient> items, AppState app) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+        childAspectRatio: 0.82,
+      ),
+      itemCount: items.length,
+      itemBuilder: (_, i) {
+        final ing = items[i];
+        final on = _selected.contains(ing.id);
+        return _IngredientTile(
+          id: ing.id,
+          name: ing.name,
+          selected: on,
+          inFridge: app.inFridge(ing.id),
+          onTap: () => setState(() => on ? _selected.remove(ing.id) : _selected.add(ing.id)),
+        );
+      },
     );
   }
 }
