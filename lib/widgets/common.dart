@@ -81,16 +81,31 @@ class IngredientImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ing = catalogById[id];
-    if (ing?.image != null) {
-      return Image.asset(ing!.image!, width: size, height: size, fit: BoxFit.contain);
+    final img = ing?.image;
+    final initials = _Initials(ing?.name ?? id, size);
+    if (img == null) return initials;
+    if (img.startsWith('http')) {
+      return Image.network(img, width: size, height: size, fit: BoxFit.contain, errorBuilder: (_, __, ___) => initials);
     }
+    return Image.asset(img, width: size, height: size, fit: BoxFit.contain);
+  }
+}
+
+/// Round badge with the first two letters, for ingredients that have no photo.
+class _Initials extends StatelessWidget {
+  final String label;
+  final double size;
+  const _Initials(this.label, this.size);
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       width: size,
       height: size,
       decoration: const BoxDecoration(color: W2T.cream, shape: BoxShape.circle),
       alignment: Alignment.center,
       child: Text(
-        (ing?.name ?? id).substring(0, 2),
+        label.length < 2 ? label : label.substring(0, 2),
         style: TextStyle(fontWeight: FontWeight.w700, color: W2T.rust, fontSize: size * 0.32),
       ),
     );

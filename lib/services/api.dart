@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
+import '../data/models.dart';
 import '../data/sample_data.dart';
 
 /// Our small backend on Vercel (see the backend/ folder).
@@ -65,6 +66,24 @@ class Api {
     if (res.statusCode != 200) throw Exception('Recipes failed (${res.statusCode})');
     final list = (jsonDecode(res.body)['recipes'] as List? ?? []);
     return list.map((e) => OnlineRecipe.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// Searches the online ingredient list (TheMealDB, 500+ items with photos).
+  static Future<List<Ingredient>> searchIngredients(String query) async {
+    final uri = Uri.parse('$apiBase/api/ingredients').replace(queryParameters: {'q': query});
+    final res = await http.get(uri).timeout(const Duration(seconds: 15));
+    if (res.statusCode != 200) throw Exception('Ingredients failed (${res.statusCode})');
+    final list = (jsonDecode(res.body)['ingredients'] as List? ?? []);
+    return [
+      for (final e in list)
+        Ingredient(
+          id: e['id'] as String,
+          name: e['name'] as String,
+          image: e['image'] as String?,
+          category: (e['category'] as String?) ?? 'Pantry',
+          shelfDays: (e['shelfDays'] as num?)?.toInt() ?? 7,
+        ),
+    ];
   }
 
   /// Sends a photo to the backend, which asks Gemini what ingredients are in it.
