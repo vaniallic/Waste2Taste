@@ -35,7 +35,8 @@ class SheetLayout extends StatelessWidget {
           ),
         ],
       ),
-      bottomNavigationBar: bottom,
+      // Butter behind the bottom bar, so its rounded corners don't show the rust background.
+      bottomNavigationBar: bottom == null ? null : ColoredBox(color: W2T.butter, child: bottom),
     );
   }
 }
@@ -113,6 +114,97 @@ class Tag extends StatelessWidget {
 
 String ingredientNames(Iterable<String> ids) =>
     ids.map((id) => (catalogById[id]?.name ?? id).toLowerCase()).join(', ');
+
+/// Spacing used everywhere, so every screen lines up the same way.
+class Gap {
+  static const page = 20.0; // left/right padding of every screen
+  static const card = 16.0; // padding inside cards
+  static const section = 28.0; // space between sections
+}
+
+/// White rounded card with a soft shadow — the only card style in the app.
+class AppCard extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final VoidCallback? onTap;
+  final Color color;
+  const AppCard({super.key, required this.child, this.padding = const EdgeInsets.all(Gap.card), this.onTap, this.color = Colors.white});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: const [BoxShadow(color: Color(0x14321005), blurRadius: 16, offset: Offset(0, 6))],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(onTap: onTap, child: Padding(padding: padding, child: child)),
+      ),
+    );
+  }
+}
+
+/// Section heading with an optional small action on the right.
+class SectionTitle extends StatelessWidget {
+  final String title;
+  final String? action;
+  final VoidCallback? onAction;
+  const SectionTitle(this.title, {super.key, this.action, this.onAction});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(child: Text(title, style: heading(18))),
+        if (action != null)
+          GestureDetector(
+            onTap: onAction,
+            child: Text(action!, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: W2T.rust)),
+          ),
+      ],
+    );
+  }
+}
+
+/// Friendly message when a list is empty, with an optional button.
+class EmptyState extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String message;
+  final String? button;
+  final VoidCallback? onButton;
+  const EmptyState({super.key, required this.icon, required this.title, required this.message, this.button, this.onButton});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(color: W2T.rustTint, borderRadius: BorderRadius.circular(14)),
+            child: Icon(icon, color: W2T.rust),
+          ),
+          const SizedBox(height: 16),
+          Text(title, style: heading(17)),
+          const SizedBox(height: 6),
+          Text(message, style: const TextStyle(color: W2T.muted, height: 1.45)),
+          if (button != null) ...[
+            const SizedBox(height: 18),
+            FilledButton(onPressed: onButton, child: Text(button!)),
+          ],
+        ],
+      ),
+    );
+  }
+}
 
 /// Big food photo with a soft shadow, as used in the design.
 class FoodImage extends StatelessWidget {
