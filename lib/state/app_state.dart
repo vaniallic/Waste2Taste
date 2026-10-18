@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/models.dart';
 import '../data/sample_data.dart';
+import '../services/notifications.dart';
 
 /// All app data lives here. Screens read it with `context.watch<AppState>()`
 /// and change it by calling the methods below. Everything is saved on the
@@ -19,6 +20,7 @@ class AppState extends ChangeNotifier {
   List<CookedEntry> history = [];
   Set<String> diet = {'Halal'};
   Set<Tool> tools = {Tool.stove, Tool.riceCooker};
+  bool reminders = false; // expiry reminders (notifications), off until the user turns them on
 
   /// Ingredients added from the online list. They are not in sample_data.dart,
   /// so we save them ourselves and put them back into catalogById on load.
@@ -43,6 +45,7 @@ class AppState extends ChangeNotifier {
       history = (j['history'] as List).map((e) => CookedEntry.fromJson(e as Map<String, dynamic>)).toList();
       diet = Set<String>.from(j['diet'] as List);
       tools = (j['tools'] as List).map((t) => Tool.values.byName(t as String)).toSet();
+      reminders = j['reminders'] as bool? ?? false;
       for (final e in (j['custom'] as List? ?? [])) {
         final ing = Ingredient.fromJson(e as Map<String, dynamic>);
         customIngredients[ing.id] = ing;
@@ -53,6 +56,7 @@ class AppState extends ChangeNotifier {
     // user added, minus what each cooked recipe used (see markCooked).
     loaded = true;
     notifyListeners();
+    if (reminders) Reminders.sync(fridge, enabled: true);
   }
 
   Future<void> _save() async {
@@ -66,6 +70,7 @@ class AppState extends ChangeNotifier {
         'history': history.map((h) => h.toJson()).toList(),
         'diet': diet.toList(),
         'tools': tools.map((t) => t.name).toList(),
+        'reminders': reminders,
         'custom': customIngredients.values.map((i) => i.toJson()).toList(),
       }),
     );
@@ -74,6 +79,8 @@ class AppState extends ChangeNotifier {
   void _changed() {
     notifyListeners();
     _save();
+    // The fridge may have changed, so re-plan the expiry reminders.
+    Reminders.sync(fridge, enabled: reminders);
   }
 
   // ---------- account ----------
@@ -226,6 +233,15 @@ class AppState extends ChangeNotifier {
   void toggleDiet(String d) {
     diet.contains(d) ? diet.remove(d) : diet.add(d);
     _changed();
+  }
+
+  /// Turns expiry reminders on/off. Returns false if they couldn't be turned on
+  /// (web, or the user said no to the notification popup).
+  Future<bool> setReminders(bool on) async {
+    if (on && !await Reminders.askPermission()) return false;
+    reminders = on;
+    _changed();
+    return true;
   }
 
   void toggleTool(Tool t) {
