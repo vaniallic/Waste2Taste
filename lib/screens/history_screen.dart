@@ -29,7 +29,7 @@ class HistoryScreen extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(Gap.page, 28, Gap.page, 120),
         children: [
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 26),
             decoration: BoxDecoration(color: W2T.olive, borderRadius: BorderRadius.circular(20)),
             child: Row(children: [
               Expanded(child: _Stat('${app.history.length}', 'meals cooked')),
@@ -93,9 +93,13 @@ class _Stat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(value, style: heading(30, color: W2T.butter)),
-      Text(label, style: const TextStyle(fontSize: 12, color: W2T.oliveSoft)),
-    ]);
+    return Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(value, style: heading(30, color: W2T.butter)),
+        const SizedBox(height: 6),
+        Text(label, style: const TextStyle(fontSize: 12, height: 1.35, color: W2T.oliveSoft)),
+      ]),
+    );
   }
 }
