@@ -13,18 +13,22 @@ class AppState extends ChangeNotifier {
   bool loaded = false;
   bool seenOnboarding = false;
   String? userName;
+  Uint8List? photo; // profile picture, saved separately because it's big
   List<FridgeItem> fridge = [];
   List<CookedEntry> history = [];
   Set<String> diet = {'Halal'};
   Set<Tool> tools = {Tool.stove, Tool.riceCooker};
 
   static const _key = 'w2t_state_v1';
+  static const _photoKey = 'w2t_photo_v1';
 
   // ---------- load & save ----------
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_key);
+    final photoRaw = prefs.getString(_photoKey);
+    if (photoRaw != null) photo = base64Decode(photoRaw);
     if (raw != null) {
       final j = jsonDecode(raw) as Map<String, dynamic>;
       seenOnboarding = j['seen'] as bool? ?? false;
@@ -83,6 +87,22 @@ class AppState extends ChangeNotifier {
   void signIn(String name) {
     userName = name.trim().isEmpty ? 'Friend' : name.trim();
     _changed();
+  }
+
+  void updateProfile({required String name, Uint8List? newPhoto}) {
+    userName = name.trim().isEmpty ? 'Friend' : name.trim();
+    photo = newPhoto;
+    _changed();
+    _savePhoto();
+  }
+
+  Future<void> _savePhoto() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (photo == null) {
+      await prefs.remove(_photoKey);
+    } else {
+      await prefs.setString(_photoKey, base64Encode(photo!));
+    }
   }
 
   void signOut() {
