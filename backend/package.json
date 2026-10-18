@@ -1,0 +1,6 @@
+{
+  "name": "waste2taste-api",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=18" }
+}
