@@ -4,11 +4,13 @@ import 'package:provider/provider.dart';
 import 'screens/home_shell.dart';
 import 'screens/login_screen.dart';
 import 'screens/onboarding_screen.dart';
+import 'services/auth.dart';
 import 'state/app_state.dart';
 import 'theme.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Auth.init(); // stays off (and harmless) until Firebase is set up
   runApp(
     ChangeNotifierProvider(
       create: (_) => AppState()..load(),
