@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -167,12 +168,24 @@ class AppState extends ChangeNotifier {
   RecipeMatch matchFor(Recipe r) => matches().firstWhere((m) => m.recipe.id == r.id,
       orElse: () => RecipeMatch(r, const [], r.ingredients.where((i) => !i.optional).toList(), const []));
 
-  /// The single best thing to cook tonight: can cook now and saves the most.
+  final _rng = Random();
+  Recipe? _tonight;
+
+  /// Random recipe for "Cook tonight" (respects the diet filter). It is picked
+  /// once per app launch so it doesn't jump around on every rebuild, and
+  /// shuffleTonight() picks another one. Works even when the fridge is empty.
   RecipeMatch? get tonightPick {
-    final ready = matches().where((m) => m.canCookNow).toList();
-    if (ready.isEmpty) return null;
-    ready.sort((a, b) => b.savesIds.length.compareTo(a.savesIds.length));
-    return ready.first;
+    final fits = recipes.where(_fitsDiet).toList();
+    if (fits.isEmpty) return null;
+    if (_tonight == null || !fits.contains(_tonight)) _tonight = fits[_rng.nextInt(fits.length)];
+    return matchFor(_tonight!);
+  }
+
+  void shuffleTonight() {
+    final fits = recipes.where((r) => _fitsDiet(r) && r != _tonight).toList();
+    if (fits.isEmpty) return;
+    _tonight = fits[_rng.nextInt(fits.length)];
+    notifyListeners();
   }
 
   /// Marks a recipe as cooked: takes one of each used ingredient out of the
