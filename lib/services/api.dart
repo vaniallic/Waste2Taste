@@ -68,9 +68,9 @@ class Api {
     return list.map((e) => OnlineRecipe.fromJson(e as Map<String, dynamic>)).toList();
   }
 
-  /// Searches the online ingredient list (TheMealDB, 500+ items with photos).
-  static Future<List<Ingredient>> searchIngredients(String query) async {
-    final uri = Uri.parse('$apiBase/api/ingredients').replace(queryParameters: {'q': query});
+  /// Searches the online ingredient list (TheMealDB, 500+ items with photos). Empty query = the whole list.
+  static Future<List<Ingredient>> searchIngredients(String query, {int? limit}) async {
+    final uri = Uri.parse('$apiBase/api/ingredients').replace(queryParameters: {'q': query, if (limit != null) 'limit': '$limit'});
     final res = await http.get(uri).timeout(const Duration(seconds: 15));
     if (res.statusCode != 200) throw Exception('Ingredients failed (${res.statusCode})');
     final list = (jsonDecode(res.body)['ingredients'] as List? ?? []);

@@ -2,7 +2,7 @@ import { cors } from './_cors.js';
 
 // GET /api/ingredients?q=chick
 // Searches the ingredient list of TheMealDB (500+ items, each with a photo).
-// Without ?q it returns the first 60 in A-Z order.
+// Without ?q it returns the first ones in A-Z order. ?limit=1000 returns everything (default 60).
 const MEALDB = 'https://www.themealdb.com/api/json/v1/1';
 
 // The full list barely changes, so keep it in memory between requests.
@@ -23,6 +23,7 @@ export default async function handler(req, res) {
   if (cors(req, res)) return;
 
   const q = String(req.query.q || '').trim().toLowerCase();
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 60, 1), 1000);
 
   try {
     let list = await loadAll();
@@ -33,7 +34,7 @@ export default async function handler(req, res) {
       list = [...starts, ...has];
     }
     res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate');
-    res.status(200).json({ ingredients: list.slice(0, 60) });
+    res.status(200).json({ ingredients: list.slice(0, limit) });
   } catch (e) {
     res.status(502).json({ error: 'Could not reach TheMealDB' });
   }
