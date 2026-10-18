@@ -1,36 +1,46 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+
+import 'screens/home_shell.dart';
+import 'screens/login_screen.dart';
+import 'screens/onboarding_screen.dart';
+import 'state/app_state.dart';
 import 'theme.dart';
 
 void main() {
-  runApp(const MyApp());
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => AppState()..load(),
+      child: const Waste2TasteApp(),
+    ),
+  );
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class Waste2TasteApp extends StatelessWidget {
+  const Waste2TasteApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Waste2Taste',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        scaffoldBackgroundColor: W2T.butter,
-        textTheme: GoogleFonts.plusJakartaSansTextTheme(),
-      ),
-      home: Scaffold(
-        backgroundColor: W2T.cream,
-        body: Center(
-          child: Text(
-            'Waste2Taste',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 32,
-              fontWeight: FontWeight.w700,
-              color: W2T.butter,
-            ),
-          ),
-        ),
-      ),
+      theme: buildTheme(),
+      home: const _Start(),
     );
+  }
+}
+
+/// Picks the first screen: onboarding → login → app.
+class _Start extends StatelessWidget {
+  const _Start();
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.watch<AppState>();
+    if (!app.loaded) return const Scaffold(backgroundColor: W2T.rust);
+    if (!app.seenOnboarding) return const OnboardingScreen();
+    if (app.userName == null) return const LoginScreen();
+    return const HomeShell();
   }
 }

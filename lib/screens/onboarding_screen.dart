@@ -24,8 +24,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   void _next() {
     if (_page < 2) {
-      _pages.nextPage(duration: const Duration(milliseconds: 400), curve: Curves.easeOutCubic);
-    } else {
+      _pages.jumpToPage(_page + 1);
       context.read<AppState>().finishOnboarding();
     }
   }
@@ -73,7 +72,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   children: [
                     for (var i = 0; i < 3; i++)
                       AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
+                        duration: Duration.zero,
                         margin: const EdgeInsets.only(right: 6),
                         width: i == _page ? 28 : 8,
                         height: 8,
@@ -83,7 +82,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
                 const SizedBox(height: 16),
                 AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 250),
+                  duration: Duration.zero,
                   child: Column(
                     key: ValueKey(_page),
                     crossAxisAlignment: CrossAxisAlignment.start,

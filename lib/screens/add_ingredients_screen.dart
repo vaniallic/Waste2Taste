@@ -88,7 +88,7 @@ class _AddIngredientsScreenState extends State<AddIngredientsScreen> {
                         child: GestureDetector(
                           onTap: () => setState(() => on ? _selected.remove(ing.id) : _selected.add(ing.id)),
                           child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 150),
+                            duration: Duration.zero,
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(18),
