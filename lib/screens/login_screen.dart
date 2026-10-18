@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../services/auth.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
 
-/// Demo sign-in: no server yet, it just remembers your name on the phone.
-/// (Real accounts with Firebase/Supabase can come later.)
+/// Login / sign up. With Firebase set up it uses real accounts (email + password, Google).
+/// Without Firebase it falls back to a simple login that just remembers your name.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -26,10 +27,64 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _submit() {
+  bool _loading = false;
+  String? _error;
+
+  /// Old simple login, used when Firebase isn't set up.
+  void _localLogin() {
     final email = _email.text.trim();
     final name = email.contains('@') ? email.split('@').first : email;
     context.read<AppState>().signIn(name.isEmpty ? 'Friend' : name[0].toUpperCase() + name.substring(1));
+  }
+
+  Future<void> _run(Future<void> Function() action) async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      await action();
+      // On success Firebase tells the app, and the app moves to the home screen by itself.
+    } catch (e) {
+      final msg = Auth.message(e);
+      if (mounted && msg != null) setState(() => _error = msg);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _submit() {
+    if (!Auth.ready) return _localLogin();
+    final email = _email.text.trim();
+    final pass = _password.text;
+    if (!email.contains('@') || !email.contains('.')) return setState(() => _error = 'Enter a valid email address.');
+    if (pass.length < 6) return setState(() => _error = 'Password must be at least 6 characters.');
+    _run(() => _signUp ? Auth.signUp(email, pass) : Auth.signIn(email, pass));
+  }
+
+  void _google() {
+    if (!Auth.ready) return _localLogin();
+    _run(Auth.google);
+  }
+
+  Future<void> _forgot() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final email = _email.text.trim();
+    if (!Auth.ready) {
+      messenger.showSnackBar(const SnackBar(content: Text('Accounts aren\'t set up yet.')));
+      return;
+    }
+    if (!email.contains('@')) {
+      setState(() => _error = 'Type your email above first, then tap Forgot password.');
+      return;
+    }
+    try {
+      await Auth.resetPassword(email);
+      messenger.showSnackBar(SnackBar(content: Text('Reset link sent to $email. Check your inbox.')));
+    } catch (e) {
+      final msg = Auth.message(e);
+      if (mounted && msg != null) setState(() => _error = msg);
+    }
   }
 
   @override
@@ -72,11 +127,20 @@ class _LoginScreenState extends State<LoginScreen> {
                   if (!_signUp)
                     Align(
                       alignment: Alignment.centerRight,
-                      child: TextButton(onPressed: () {}, child: const Text('Forgot password?', style: TextStyle(color: W2T.rust))),
+                      child: TextButton(onPressed: _forgot, child: const Text('Forgot password?', style: TextStyle(color: W2T.rust))),
                     )
                   else
                     const SizedBox(height: 16),
-                  FilledButton(onPressed: _submit, child: Text(_signUp ? 'Create account' : 'Login')),
+                  if (_error != null) ...[
+                    Text(_error!, style: const TextStyle(color: W2T.danger, fontSize: 13)),
+                    const SizedBox(height: 12),
+                  ],
+                  FilledButton(
+                    onPressed: _loading ? null : _submit,
+                    child: _loading
+                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
+                        : Text(_signUp ? 'Create account' : 'Login'),
+                  ),
                   const SizedBox(height: 20),
                   const Row(children: [
                     Expanded(child: Divider(color: W2T.divider)),
@@ -85,13 +149,25 @@ class _LoginScreenState extends State<LoginScreen> {
                   ]),
                   const SizedBox(height: 14),
                   Row(children: [
-                    Expanded(child: _SocialButton('Google', onTap: _submit)),
+                    Expanded(child: _SocialButton('Google', onTap: _loading ? null : _google)),
                     const SizedBox(width: 12),
-                    Expanded(child: _SocialButton('Apple', onTap: _submit)),
+                    Expanded(
+                      child: _SocialButton(
+                        'Apple',
+                        onTap: _loading
+                            ? null
+                            : () => Auth.ready
+                                ? ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Apple sign-in is coming soon.')))
+                                : _localLogin(),
+                      ),
+                    ),
                   ]),
                   const SizedBox(height: 24),
                   TextButton(
-                    onPressed: () => setState(() => _signUp = !_signUp),
+                    onPressed: () => setState(() {
+                      _signUp = !_signUp;
+                      _error = null;
+                    }),
                     child: Text(_signUp ? 'Already have an account? Login' : "Don't have an account? Sign up",
                         style: const TextStyle(color: W2T.rust, fontWeight: FontWeight.w600)),
                   ),
@@ -107,7 +183,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
 class _SocialButton extends StatelessWidget {
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   const _SocialButton(this.label, {required this.onTap});
 
   @override
