@@ -64,6 +64,40 @@ class _ScanScreenState extends State<ScanScreen> {
     }
   }
 
+  // Words Gemini likes to add that aren't part of the ingredient's name.
+  static const _filler = {
+    'raw', 'fresh', 'whole', 'frozen', 'sliced', 'chopped', 'minced', 'ground', 'cooked',
+    'fillet', 'fillets', 'steak', 'steaks', 'slice', 'slices', 'piece', 'pieces', 'cut', 'cuts', 'chunk', 'chunks',
+  };
+
+  Ingredient? _pick(List<Ingredient> hits, String want) {
+    for (final h in hits) {
+      if (h.name.toLowerCase() == want) return h;
+    }
+    return null;
+  }
+
+  /// Finds [name] in the online list. First the whole name ("red onion"), then
+  /// word by word from the end, skipping filler words ("raw beef steak" -> "beef").
+  Future<Ingredient?> _lookup(String name) async {
+    final want = name.trim().toLowerCase();
+    if (want.isEmpty) return null;
+    final whole = await Api.searchIngredients(want, limit: 8);
+    final exact = _pick(whole, want);
+    if (exact != null) return exact;
+    final starts = whole.where((h) => h.name.toLowerCase().startsWith(want)).firstOrNull;
+    if (starts != null) return starts;
+
+    final words = want.split(RegExp(r'[^a-z]+')).where((w) => w.length >= 3 && !_filler.contains(w)).toList().reversed.take(2);
+    for (final w in words) {
+      final hits = await Api.searchIngredients(w, limit: 8);
+      final single = w.endsWith('es') ? w.substring(0, w.length - 2) : (w.endsWith('s') ? w.substring(0, w.length - 1) : w);
+      final hit = _pick(hits, w) ?? _pick(hits, single);
+      if (hit != null) return hit;
+    }
+    return null;
+  }
+
   /// Gemini sees more than our built-in list knows. For everything it spotted
   /// that isn't built in, look it up in the online ingredient list (the same one
   /// the search uses), so "salmon" can be added too. What still isn't found stays
@@ -72,18 +106,9 @@ class _ScanScreenState extends State<ScanScreen> {
     final result = await Future.wait(found.map((f) async {
       if (f.known) return f;
       try {
-        final hits = await Api.searchIngredients(f.name, limit: 8);
-        final want = f.name.trim().toLowerCase();
-        Ingredient? best;
-        for (final h in hits) {
-          if (h.name.toLowerCase() == want) {
-            best = h;
-            break;
-          }
-        }
-        best ??= hits.where((h) => h.name.toLowerCase().startsWith(want)).firstOrNull;
+        final best = await _lookup(f.name);
         if (best == null) return f;
-        catalogById.putIfAbsent(best.id, () => best!);
+        catalogById.putIfAbsent(best.id, () => best);
         return ScannedIngredient(best.id, best.name, true);
       } catch (_) {
         return f; // lookup failed: leave it under "Also spotted"
