@@ -1,10 +1,12 @@
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../services/api.dart';
+import '../services/photo.dart';
 import '../state/app_state.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
@@ -29,7 +31,10 @@ class _ScanScreenState extends State<ScanScreen> {
   Future<void> _take(ImageSource source) async {
     final file = await ImagePicker().pickImage(source: source, maxWidth: 1024, imageQuality: 75);
     if (file == null) return;
-    final bytes = await file.readAsBytes();
+    final raw = await file.readAsBytes();
+    // Shrink big photos first (the browser doesn't always do it for us).
+    final bytes = await shrinkPhoto(raw);
+    final mime = identical(bytes, raw) && (file.mimeType?.isNotEmpty ?? false) ? file.mimeType! : 'image/jpeg';
     setState(() {
       _photo = bytes;
       _loading = true;
@@ -38,15 +43,17 @@ class _ScanScreenState extends State<ScanScreen> {
       _picked.clear();
     });
     try {
-      final found = await Api.scan(bytes, mime: file.mimeType ?? 'image/jpeg');
+      final found = await Api.scan(bytes, mime: mime);
       setState(() {
         _found = found;
         _picked.addAll(found.where((f) => f.known).map((f) => f.id));
       });
     } catch (e) {
+      debugPrint('Scan failed: $e');
+      final code = e is ScanFailed && e.status != null ? ' (error ${e.status})' : '';
       setState(() => _error = e is TooManyRequests
           ? 'You scanned a lot in a short time. Wait a few minutes, or pick from the list.'
-          : 'Couldn\'t read the photo. Try again with better light.');
+          : 'Couldn\'t read the photo$code. Try again with better light.');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
