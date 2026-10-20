@@ -44,6 +44,7 @@ class AppState extends ChangeNotifier {
     if (raw != null) {
       final j = jsonDecode(raw) as Map<String, dynamic>;
       userName = j['name'] as String?;
+      seenOnboarding = j['seen'] as bool? ?? false;
       _applyMap(j);
     }
     // First launch: the fridge starts empty. After that it only holds what the
@@ -56,8 +57,9 @@ class AppState extends ChangeNotifier {
 
   /// Everything that belongs to the account (also what goes to the cloud).
   /// The name comes from the login and the photo is big, so neither is in here.
+  /// Whether this device has shown the landing slides is a device thing, so it
+  /// isn't here either (it is only saved locally, see _save).
   Map<String, dynamic> _toMap() => {
-        'seen': seenOnboarding,
         'fridge': fridge.map((f) => f.toJson()).toList(),
         'history': history.map((h) => h.toJson()).toList(),
         'diet': diet.toList(),
@@ -67,7 +69,6 @@ class AppState extends ChangeNotifier {
       };
 
   void _applyMap(Map<String, dynamic> j) {
-    seenOnboarding = j['seen'] as bool? ?? false;
     fridge = (j['fridge'] as List? ?? []).map((e) => FridgeItem.fromJson(Map<String, dynamic>.from(e as Map))).toList();
     history = (j['history'] as List? ?? []).map((e) => CookedEntry.fromJson(Map<String, dynamic>.from(e as Map))).toList();
     diet = Set<String>.from(j['diet'] as List? ?? ['Halal']);
@@ -82,7 +83,7 @@ class AppState extends ChangeNotifier {
 
   Future<void> _save() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_key, jsonEncode({..._toMap(), 'name': userName}));
+    await prefs.setString(_key, jsonEncode({..._toMap(), 'name': userName, 'seen': seenOnboarding}));
   }
 
   // ---------- cloud sync ----------
@@ -197,7 +198,7 @@ class AppState extends ChangeNotifier {
       _pushTimer?.cancel();
       if (_cloudSynced) await Cloud.push(_toMap());
       _cloudSynced = false;
-      seenOnboarding = true;
+      seenOnboarding = false; // the landing slides show again, like on a fresh install
       fridge = [];
       history = [];
       diet = {'Halal'};
