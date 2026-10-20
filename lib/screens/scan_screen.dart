@@ -50,10 +50,12 @@ class _ScanScreenState extends State<ScanScreen> {
       });
     } catch (e) {
       debugPrint('Scan failed: $e');
-      final code = e is ScanFailed && e.status != null ? ' (error ${e.status})' : '';
+      final code = e is ScanFailed && e.status != null ? ' (error ${e.status})' : ' (${e.runtimeType})';
       setState(() => _error = e is TooManyRequests
           ? 'You scanned a lot in a short time. Wait a few minutes, or pick from the list.'
-          : 'Couldn\'t read the photo$code. Try again with better light.');
+          : e is ScanFailed && e.status == 503
+              ? 'The scanner is busy right now. Try again in a minute, or pick from the list.'
+              : 'Couldn\'t read the photo$code. Try again with better light.');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
