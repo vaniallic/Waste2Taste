@@ -10,6 +10,7 @@ import '../data/models.dart';
 import '../data/sample_data.dart';
 import '../services/notifications.dart';
 import '../services/auth.dart';
+import '../services/cloud.dart';
 
 /// All app data lives here. Screens read it with `context.watch<AppState>()`
 /// and change it by calling the methods below. Everything is saved on the
@@ -42,18 +43,8 @@ class AppState extends ChangeNotifier {
     if (photoRaw != null) photo = base64Decode(photoRaw);
     if (raw != null) {
       final j = jsonDecode(raw) as Map<String, dynamic>;
-      seenOnboarding = j['seen'] as bool? ?? false;
       userName = j['name'] as String?;
-      fridge = (j['fridge'] as List).map((e) => FridgeItem.fromJson(e as Map<String, dynamic>)).toList();
-      history = (j['history'] as List).map((e) => CookedEntry.fromJson(e as Map<String, dynamic>)).toList();
-      diet = Set<String>.from(j['diet'] as List);
-      tools = (j['tools'] as List).map((t) => Tool.values.byName(t as String)).toSet();
-      reminders = j['reminders'] as bool? ?? false;
-      for (final e in (j['custom'] as List? ?? [])) {
-        final ing = Ingredient.fromJson(e as Map<String, dynamic>);
-        customIngredients[ing.id] = ing;
-        catalogById.putIfAbsent(ing.id, () => ing);
-      }
+      _applyMap(j);
     }
     // First launch: the fridge starts empty. After that it only holds what the
     // user added, minus what each cooked recipe used (see markCooked).
@@ -63,26 +54,72 @@ class AppState extends ChangeNotifier {
     if (reminders) Reminders.sync(fridge, enabled: true);
   }
 
-  Future<void> _save() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _key,
-      jsonEncode({
+  /// Everything that belongs to the account (also what goes to the cloud).
+  /// The name comes from the login and the photo is big, so neither is in here.
+  Map<String, dynamic> _toMap() => {
         'seen': seenOnboarding,
-        'name': userName,
         'fridge': fridge.map((f) => f.toJson()).toList(),
         'history': history.map((h) => h.toJson()).toList(),
         'diet': diet.toList(),
         'tools': tools.map((t) => t.name).toList(),
         'reminders': reminders,
         'custom': customIngredients.values.map((i) => i.toJson()).toList(),
-      }),
-    );
+      };
+
+  void _applyMap(Map<String, dynamic> j) {
+    seenOnboarding = j['seen'] as bool? ?? false;
+    fridge = (j['fridge'] as List? ?? []).map((e) => FridgeItem.fromJson(Map<String, dynamic>.from(e as Map))).toList();
+    history = (j['history'] as List? ?? []).map((e) => CookedEntry.fromJson(Map<String, dynamic>.from(e as Map))).toList();
+    diet = Set<String>.from(j['diet'] as List? ?? ['Halal']);
+    tools = (j['tools'] as List? ?? ['stove', 'riceCooker']).map((t) => Tool.values.byName(t as String)).toSet();
+    reminders = j['reminders'] as bool? ?? false;
+    for (final e in (j['custom'] as List? ?? [])) {
+      final ing = Ingredient.fromJson(Map<String, dynamic>.from(e as Map));
+      customIngredients[ing.id] = ing;
+      catalogById.putIfAbsent(ing.id, () => ing);
+    }
+  }
+
+  Future<void> _save() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_key, jsonEncode({..._toMap(), 'name': userName}));
+  }
+
+  // ---------- cloud sync ----------
+
+  Timer? _pushTimer;
+  bool _cloudSynced = false; // true once we know what the cloud has, so we never overwrite it blindly
+
+  /// Called when someone is logged in: the cloud copy wins. If the account has
+  /// nothing saved yet, what is on this device becomes its first copy.
+  Future<void> _pullCloud() async {
+    _cloudSynced = false;
+    try {
+      final remote = await Cloud.pull().timeout(const Duration(seconds: 6));
+      if (remote == null) {
+        await Cloud.push(_toMap());
+      } else {
+        _applyMap(remote);
+        notifyListeners();
+        _save();
+        Reminders.sync(fridge, enabled: reminders);
+      }
+      _cloudSynced = true;
+    } catch (e) {
+      debugPrint('Cloud sync is off for now: $e');
+    }
+  }
+
+  void _pushLater() {
+    if (!_cloudSynced || Auth.user == null) return;
+    _pushTimer?.cancel();
+    _pushTimer = Timer(const Duration(seconds: 1), () => Cloud.push(_toMap()));
   }
 
   void _changed() {
     notifyListeners();
     _save();
+    _pushLater();
     // The fridge may have changed, so re-plan the expiry reminders.
     Reminders.sync(fridge, enabled: reminders);
   }
@@ -102,11 +139,13 @@ class AppState extends ChangeNotifier {
     // The first event says who is logged in (the web needs a moment to restore the session).
     final first = await Auth.changes.first.timeout(const Duration(seconds: 4), onTimeout: () => Auth.user);
     userName = first == null ? null : _nameOf(first);
+    if (first != null) unawaited(_pullCloud());
     _authSub = Auth.changes.listen((u) {
       final name = u == null ? null : _nameOf(u);
       if (name == userName) return;
       userName = name;
       _changed();
+      if (u != null) unawaited(_pullCloud());
     });
   }
 
@@ -124,6 +163,7 @@ class AppState extends ChangeNotifier {
   @override
   void dispose() {
     _authSub?.cancel();
+    _pushTimer?.cancel();
     super.dispose();
   }
 
@@ -150,10 +190,27 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  void signOut() {
+  Future<void> signOut() async {
+    if (Auth.ready) {
+      // Save the latest changes to the account, then empty this device so the
+      // next person to log in here never sees (or uploads) someone else's data.
+      _pushTimer?.cancel();
+      if (_cloudSynced) await Cloud.push(_toMap());
+      _cloudSynced = false;
+      seenOnboarding = true;
+      fridge = [];
+      history = [];
+      diet = {'Halal'};
+      tools = {Tool.stove, Tool.riceCooker};
+      reminders = false;
+      photo = null;
+      _savePhoto();
+    }
     userName = null;
-    Auth.signOut();
-    _changed();
+    notifyListeners();
+    _save();
+    Reminders.sync(fridge, enabled: false);
+    await Auth.signOut();
   }
 
   // ---------- fridge ----------
