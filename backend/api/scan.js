@@ -4,7 +4,9 @@ import { tooMany } from './_limit.js';
 // POST /api/scan   body: { "image": "<base64>", "mime": "image/jpeg" }
 // Sends the photo to Gemini and returns the ingredients it sees.
 // The API key stays here on the server, never in the app.
-const MODEL = 'gemini-2.5-flash';
+// Google retires old models from time to time. To switch without touching the code,
+// set GEMINI_MODEL in Vercel (Settings > Environment Variables).
+const MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
 
 // Same ids as lib/data/sample_data.dart, so the app can add them straight away.
 const KNOWN = [
