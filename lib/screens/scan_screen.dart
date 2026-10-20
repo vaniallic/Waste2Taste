@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import '../data/models.dart';
+import '../data/sample_data.dart';
 import '../services/api.dart';
 import '../services/photo.dart';
 import '../state/app_state.dart';
@@ -43,7 +45,8 @@ class _ScanScreenState extends State<ScanScreen> {
       _picked.clear();
     });
     try {
-      final found = await Api.scan(bytes, mime: mime);
+      final scanned = await Api.scan(bytes, mime: mime);
+      final found = await _matchOnline(scanned);
       setState(() {
         _found = found;
         _picked.addAll(found.where((f) => f.known).map((f) => f.id));
@@ -59,6 +62,36 @@ class _ScanScreenState extends State<ScanScreen> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  /// Gemini sees more than our built-in list knows. For everything it spotted
+  /// that isn't built in, look it up in the online ingredient list (the same one
+  /// the search uses), so "salmon" can be added too. What still isn't found stays
+  /// under "Also spotted".
+  Future<List<ScannedIngredient>> _matchOnline(List<ScannedIngredient> found) async {
+    final result = await Future.wait(found.map((f) async {
+      if (f.known) return f;
+      try {
+        final hits = await Api.searchIngredients(f.name, limit: 8);
+        final want = f.name.trim().toLowerCase();
+        Ingredient? best;
+        for (final h in hits) {
+          if (h.name.toLowerCase() == want) {
+            best = h;
+            break;
+          }
+        }
+        best ??= hits.where((h) => h.name.toLowerCase().startsWith(want)).firstOrNull;
+        if (best == null) return f;
+        catalogById.putIfAbsent(best.id, () => best!);
+        return ScannedIngredient(best.id, best.name, true);
+      } catch (_) {
+        return f; // lookup failed: leave it under "Also spotted"
+      }
+    }));
+    // The same ingredient can come back twice (say "Salmon" and "Salmon fillet").
+    final seen = <String>{};
+    return result.where((f) => !f.known || seen.add(f.id)).toList();
   }
 
   void _addToFridge() {
