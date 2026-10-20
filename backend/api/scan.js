@@ -4,9 +4,14 @@ import { tooMany } from './_limit.js';
 // POST /api/scan   body: { "image": "<base64>", "mime": "image/jpeg" }
 // Sends the photo to Gemini and returns the ingredients it sees.
 // The API key stays here on the server, never in the app.
-// Google retires old models from time to time. To switch without touching the code,
-// set GEMINI_MODEL in Vercel (Settings > Environment Variables).
-const MODEL = process.env.GEMINI_MODEL || 'gemini-3.8-flash';
+// Google retires old models and the newest one is sometimes overloaded, so we
+// try a list of models in order. To change them without touching the code, set
+// GEMINI_MODELS in Vercel (comma separated, e.g. "gemini-3.8-flash,gemini-3.6-flash").
+const MODELS = (process.env.GEMINI_MODELS || 'gemini-3.8-flash,gemini-3.6-flash,gemini-3.5-flash-lite')
+  .split(',')
+  .map((m) => m.trim())
+  .filter(Boolean);
+const TRY_SECONDS = 10; // give up on one model after this long and try the next
 
 // Same ids as lib/data/sample_data.dart, so the app can add them straight away.
 const KNOWN = [
@@ -38,16 +43,34 @@ export default async function handler(req, res) {
   if (!['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'].includes(mime)) return res.status(415).json({ error: 'Use a jpeg, png, webp or heic photo' });
 
   try {
-    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: PROMPT }, { inline_data: { mime_type: mime, data: image } }] }],
-        generationConfig: { responseMimeType: 'application/json', temperature: 0.2 },
-      }),
+    const body = JSON.stringify({
+      contents: [{ parts: [{ text: PROMPT }, { inline_data: { mime_type: mime, data: image } }] }],
+      generationConfig: { responseMimeType: 'application/json', temperature: 0.2 },
     });
-    const j = await r.json();
-    if (!r.ok) return res.status(502).json({ error: j.error?.message || 'Gemini error' });
+
+    let j = null;
+    let lastError = 'Gemini error';
+    for (const model of MODELS) {
+      try {
+        const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+          body,
+          signal: AbortSignal.timeout(TRY_SECONDS * 1000),
+        });
+        const data = await r.json();
+        if (r.ok) {
+          j = data;
+          break;
+        }
+        lastError = data.error?.message || `Gemini error ${r.status}`;
+        // A bad request won't get better with another model, but busy or missing ones might.
+        if (![404, 429, 500, 503].includes(r.status)) break;
+      } catch (e) {
+        lastError = 'Gemini took too long';
+      }
+    }
+    if (!j) return res.status(503).json({ error: lastError });
 
     const text = j.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
     const parsed = JSON.parse(text);
